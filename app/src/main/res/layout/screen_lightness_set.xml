@@ -26,7 +26,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_R"
+                android:id="@+id/seekBarR"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:max="255"
@@ -47,7 +47,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_G"
+                android:id="@+id/seekBarG"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:max="255"
@@ -68,7 +68,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_B"
+                android:id="@+id/seekBarB"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:max="255"
@@ -89,7 +89,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_A"
+                android:id="@+id/seekBarA"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:max="225"

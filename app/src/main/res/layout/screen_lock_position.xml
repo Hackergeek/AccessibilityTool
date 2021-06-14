@@ -26,7 +26,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_w"
+                android:id="@+id/seekBarWidth"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:progressBackgroundTint="@color/textColor" />
@@ -46,7 +46,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_h"
+                android:id="@+id/seekBarHeight"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:progressBackgroundTint="@color/textColor" />
@@ -66,7 +66,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_x"
+                android:id="@+id/seekBarX"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:progressBackgroundTint="@color/textColor" />
@@ -86,7 +86,7 @@
                 android:textColor="@color/textColor" />
 
             <SeekBar
-                android:id="@+id/seekBar_y"
+                android:id="@+id/seekBarY"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:progressBackgroundTint="@color/textColor" />

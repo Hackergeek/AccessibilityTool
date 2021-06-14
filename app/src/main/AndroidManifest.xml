@@ -19,7 +19,7 @@
         android:supportsRtl="true">
 
         <receiver
-            android:name=".MyScreenOffReceiver"
+            android:name=".ScreenOffReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -28,7 +28,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".MyInstallReceiver"
+            android:name=".PackageChangeReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -38,7 +38,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".MyDeviceAdminReceiver"
+            android:name=".DeviceAdminReceiver"
             android:description="@string/app_name"
             android:enabled="true"
             android:exported="true"
