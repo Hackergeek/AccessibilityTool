@@ -27,7 +27,7 @@ class ScreenLightness constructor(private val context: Context) {
         params!!.format = PixelFormat.TRANSPARENT
         params!!.gravity = Gravity.START or Gravity.TOP
         val metrics = DisplayMetrics()
-        context.display?.getRealMetrics(metrics)
+        windowManager.defaultDisplay.getRealMetrics(metrics)
         params!!.width = metrics.widthPixels
         params!!.height = metrics.heightPixels
         params!!.alpha = 1f
@@ -47,7 +47,7 @@ class ScreenLightness constructor(private val context: Context) {
     fun refreshOnOrientationChange() {
         if (imageView != null) {
             val metrics = DisplayMetrics()
-            context.display?.getRealMetrics(metrics)
+            windowManager.defaultDisplay.getRealMetrics(metrics)
             if (params!!.width != metrics.widthPixels || params!!.height != metrics.heightPixels) {
                 params!!.width = metrics.widthPixels
                 params!!.height = metrics.heightPixels
@@ -80,7 +80,7 @@ class ScreenLightness constructor(private val context: Context) {
         dialog.show()
         val windowLayoutParams: WindowManager.LayoutParams = win!!.attributes
         val metrics = DisplayMetrics()
-        context.display?.getRealMetrics(metrics)
+        windowManager.defaultDisplay.getRealMetrics(metrics)
         if (metrics.heightPixels > metrics.widthPixels) {
             windowLayoutParams.width = (metrics.widthPixels / 6) * 5
             windowLayoutParams.height = metrics.heightPixels / 2

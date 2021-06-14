@@ -157,7 +157,7 @@ class ScreenLock constructor(private val context: Context) {
     }
 
     init {
-        context.display?.getRealMetrics(metrics)
+        windowManager.defaultDisplay.getRealMetrics(metrics)
         width = sharedPreferences.getInt(WIDTH, metrics.widthPixels / 20)
         height = sharedPreferences.getInt(HEIGHT, metrics.widthPixels / 20)
         px = sharedPreferences.getInt(POSITION_X, metrics.widthPixels - width)

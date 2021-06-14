@@ -27,8 +27,8 @@ class MyAccessibilityService : AccessibilityService() {
         }
         mainFunctions = MainFunctions(this)
         mainFunctions!!.onServiceConnected()
-        if (MyAccessibilityServiceNoGesture.mainFunctions != null) {
-            MyAccessibilityServiceNoGesture.mainFunctions!!.handler!!.sendEmptyMessage(0x04)
+        if (mainFunctions != null) {
+            mainFunctions!!.handler!!.sendEmptyMessage(0x04)
         }
     }
 

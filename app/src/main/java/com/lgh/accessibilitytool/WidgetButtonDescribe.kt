@@ -26,28 +26,6 @@ class WidgetButtonDescribe {
         onlyClick = false
     }
 
-    constructor(
-        packageName: String,
-        activityName: String,
-        className: String,
-        idName: String,
-        describe: String,
-        text: String,
-        bonus: Rect,
-        clickable: Boolean,
-        onlyClick: Boolean
-    ) {
-        this.packageName = packageName
-        this.activityName = activityName
-        this.className = className
-        this.idName = idName
-        this.describe = describe
-        this.text = text
-        this.bonus = bonus
-        this.clickable = clickable
-        this.onlyClick = onlyClick
-    }
-
     constructor(widgetDescribe: WidgetButtonDescribe) {
         packageName = widgetDescribe.packageName
         activityName = widgetDescribe.activityName

@@ -49,28 +49,28 @@ class MainFunctions(private val service: AccessibilityService) {
     private var doublePress = false
     private var isReleaseUp = false
     private var isReleaseDown = false
-    private var skip_advertising = false
+    private var skipAdvertising = false
     private var record_message = false
-    private var control_lightness = false
-    private var control_lock = false
+    private var controlLightness = false
+    private var controlLock = false
     private var control_music = false
-    private var control_music_only_lock = false
+    private var controlMusicOnlyLock = false
     private var is_state_change_a = false
     private var is_state_change_b = false
     private var is_state_change_c = false
-    private var star_up: Long = 0
+    private var startUpTimeInMills: Long = 0
     private var star_down: Long = 0
     private var win_state_count = 0
     private var vibration_strength = 0
     var handler: Handler? = null
     private lateinit var sharedPreferences: SharedPreferences
-    private var future_v: ScheduledFuture<*>? = null
-    private var future_a: ScheduledFuture<*>? = null
-    private var future_b: ScheduledFuture<*>? = null
+    private var futureV: ScheduledFuture<*>? = null
+    private var futureA: ScheduledFuture<*>? = null
+    private var futureB: ScheduledFuture<*>? = null
     private lateinit var executorService: ScheduledExecutorService
-    private var audioManager: AudioManager? = null
-    private var packageManager: PackageManager? = null
-    private var vibrator: Vibrator? = null
+    private lateinit var audioManager: AudioManager
+    private lateinit var packageManager: PackageManager
+    private lateinit var vibrator: Vibrator
     private var pac_msg: MutableSet<String?>? = null
     private lateinit var launchPackageSet: MutableSet<String>
     private lateinit var whitePackageList: MutableSet<String>
@@ -125,12 +125,12 @@ class MainFunctions(private val service: AccessibilityService) {
             screenOnReceiver = ScreenOffReceiver()
             vibration_strength = sharedPreferences.getInt(VIBRATION_STRENGTH, 50)
             pac_msg = sharedPreferences.getStringSet(PAC_MSG, HashSet())
-            whitePackageList = sharedPreferences.getStringSet(PAC_WHITE, null) as MutableSet<String>
-            skip_advertising = sharedPreferences.getBoolean(SKIP_ADVERTISING, true)
+            whitePackageList = sharedPreferences.getStringSet(PAC_WHITE, mutableSetOf<String>()) as MutableSet<String>
+            skipAdvertising = sharedPreferences.getBoolean(SKIP_ADVERTISING, true)
             control_music = sharedPreferences.getBoolean(CONTROL_MUSIC, true)
             record_message = sharedPreferences.getBoolean(RECORD_MESSAGE, false)
-            control_lightness = sharedPreferences.getBoolean(CONTROL_LIGHTNESS, false)
-            control_lock = sharedPreferences.getBoolean(
+            controlLightness = sharedPreferences.getBoolean(CONTROL_LIGHTNESS, false)
+            controlLock = sharedPreferences.getBoolean(
                 CONTROL_LOCK,
                 true
             ) && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || devicePolicyManager!!.isAdminActive(
@@ -138,7 +138,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     service, DeviceAdminReceiver::class.java
                 )
             ))
-            control_music_only_lock = sharedPreferences.getBoolean(CONTROL_MUSIC_ONLY_LOCK, false)
+            controlMusicOnlyLock = sharedPreferences.getBoolean(CONTROL_MUSIC_ONLY_LOCK, false)
             updatePackage()
             val packageChangeIntent = IntentFilter()
             packageChangeIntent.addAction(Intent.ACTION_PACKAGE_ADDED)
@@ -150,12 +150,12 @@ class MainFunctions(private val service: AccessibilityService) {
             screenIntent.addAction(Intent.ACTION_SCREEN_OFF)
             service.registerReceiver(screenOnReceiver, screenIntent)
             savePath = service.externalCacheDir!!.absolutePath
-            if (skip_advertising) {
+            if (skipAdvertising) {
                 (accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).also {
                     accessibilityServiceInfo.eventTypes = it
                 }
             }
-            if (control_music && !control_music_only_lock) {
+            if (control_music && !controlMusicOnlyLock) {
                 accessibilityServiceInfo.flags =
                     accessibilityServiceInfo.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
             }
@@ -163,10 +163,10 @@ class MainFunctions(private val service: AccessibilityService) {
                 accessibilityServiceInfo.eventTypes =
                     accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
             }
-            if (control_lightness) {
+            if (controlLightness) {
                 screenLightness!!.showFloat()
             }
-            if (control_lock) {
+            if (controlLock) {
                 screenLock!!.showLockFloat()
             }
             service.serviceInfo = accessibilityServiceInfo
@@ -193,9 +193,9 @@ class MainFunctions(private val service: AccessibilityService) {
                 keyWordList = ArrayList()
                 keyWordList!!.add("跳过")
             }
-            future_b = executorService.schedule(Runnable { }, 0, TimeUnit.MILLISECONDS)
-            future_a = future_b
-            future_v = future_a
+            futureB = executorService.schedule(Runnable { }, 0, TimeUnit.MILLISECONDS)
+            futureA = futureB
+            futureV = futureA
             handler = Handler { msg ->
                 when (msg.what) {
                     0x00 -> mainUI()
@@ -205,7 +205,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     0x02 -> updatePackage()
                     0x03 -> {
                         cur_pac = "ScreenOff PackageName"
-                        if (control_music && control_music_only_lock) {
+                        if (control_music && controlMusicOnlyLock) {
                             accessibilityServiceInfo.flags =
                                 accessibilityServiceInfo.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                             service.serviceInfo = accessibilityServiceInfo
@@ -214,7 +214,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     0x04 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         service.disableSelf()
                     }
-                    0x05 -> if (control_music && control_music_only_lock) {
+                    0x05 -> if (control_music && controlMusicOnlyLock) {
                         accessibilityServiceInfo.flags =
                             accessibilityServiceInfo.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
                         service.serviceInfo = accessibilityServiceInfo
@@ -228,7 +228,6 @@ class MainFunctions(private val service: AccessibilityService) {
     }
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
-//        Log.i(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + "-" + event.getPackageName() + "-" + event.getClassName());
         try {
             when (event.eventType) {
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
@@ -239,23 +238,23 @@ class MainFunctions(private val service: AccessibilityService) {
                     val activityName = temClass?.toString()
                     if (packageName != null) {
                         if (packageName != cur_pac) {
-                            if (launchPackageSet!!.contains(packageName)) {
+                            if (launchPackageSet.contains(packageName)) {
                                 cur_pac = packageName
-                                future_a!!.cancel(false)
-                                future_b!!.cancel(false)
-                                accessibilityServiceInfo!!.eventTypes =
-                                    accessibilityServiceInfo!!.eventTypes or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                                futureA!!.cancel(false)
+                                futureB!!.cancel(false)
+                                accessibilityServiceInfo.eventTypes =
+                                    accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                                 service.serviceInfo = accessibilityServiceInfo
                                 is_state_change_a = true
                                 is_state_change_b = true
                                 is_state_change_c = true
                                 win_state_count = 0
                                 widgetSet = null
-                                future_a = executorService!!.schedule({
+                                futureA = executorService!!.schedule({
                                     is_state_change_a = false
                                     is_state_change_c = false
                                 }, 8000, TimeUnit.MILLISECONDS)
-                                future_b = executorService!!.schedule({
+                                futureB = executorService!!.schedule({
                                     accessibilityServiceInfo!!.eventTypes =
                                         accessibilityServiceInfo!!.eventTypes and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED.inv()
                                     service.serviceInfo = accessibilityServiceInfo
@@ -281,7 +280,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                 if (skipPositionDescribe != null) {
                                     is_state_change_a = false
                                     is_state_change_c = false
-                                    future_a!!.cancel(false)
+                                    futureA!!.cancel(false)
                                     executorService!!.scheduleAtFixedRate(
                                         object : Runnable {
                                             var num = 0
@@ -363,13 +362,12 @@ class MainFunctions(private val service: AccessibilityService) {
                 KeyEvent.KEYCODE_VOLUME_UP -> {
                     when (event.action) {
                         KeyEvent.ACTION_DOWN -> {
-                            //                            Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_UP -> KeyEvent.ACTION_DOWN");
-                            star_up = System.currentTimeMillis()
+                            startUpTimeInMills = System.currentTimeMillis()
                             isReleaseUp = false
                             doublePress = false
                             if (isReleaseDown) {
-                                future_v =
-                                    executorService!!.schedule({ //                                        Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_UP -> THREAD");
+                                futureV =
+                                    executorService.schedule({ //                                        Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_UP -> THREAD");
                                         if (!isReleaseDown) {
                                             simulateMediaButton!!.sendMediaButton(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
                                             vibrator!!.vibrate(vibration_strength.toLong())
@@ -383,10 +381,9 @@ class MainFunctions(private val service: AccessibilityService) {
                             }
                         }
                         KeyEvent.ACTION_UP -> {
-                            //                            Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_UP -> KeyEvent.ACTION_UP");
-                            future_v!!.cancel(false)
+                            futureV!!.cancel(false)
                             isReleaseUp = true
-                            if (!doublePress && System.currentTimeMillis() - star_up < 800) {
+                            if (!doublePress && System.currentTimeMillis() - startUpTimeInMills < 800) {
                                 audioManager!!.adjustVolume(
                                     AudioManager.ADJUST_RAISE,
                                     AudioManager.FLAG_SHOW_UI
@@ -404,8 +401,8 @@ class MainFunctions(private val service: AccessibilityService) {
                             isReleaseDown = false
                             doublePress = false
                             if (isReleaseUp) {
-                                future_v =
-                                    executorService!!.schedule({ //                                        Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_DOWN -> THREAD");
+                                futureV =
+                                    executorService.schedule({ //                                        Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_DOWN -> THREAD");
                                         if (!isReleaseUp) {
                                             simulateMediaButton!!.sendMediaButton(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
                                             vibrator!!.vibrate(vibration_strength.toLong())
@@ -420,7 +417,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         }
                         KeyEvent.ACTION_UP -> {
                             //                            Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_DOWN -> KeyEvent.ACTION_UP");
-                            future_v!!.cancel(false)
+                            futureV!!.cancel(false)
                             isReleaseDown = true
                             if (!doublePress && System.currentTimeMillis() - star_down < 800) {
                                 audioManager!!.adjustVolume(
@@ -443,10 +440,10 @@ class MainFunctions(private val service: AccessibilityService) {
 
     fun onConfigurationChanged(newConfig: Configuration) {
         try {
-            if (control_lightness) {
+            if (controlLightness) {
                 screenLightness!!.refreshOnOrientationChange()
             }
-            if (control_lock) {
+            if (controlLock) {
                 when (newConfig.orientation) {
                     Configuration.ORIENTATION_PORTRAIT -> screenLock!!.showLockFloat()
                     Configuration.ORIENTATION_LANDSCAPE -> screenLock!!.dismiss()
@@ -641,8 +638,8 @@ class MainFunctions(private val service: AccessibilityService) {
         is_state_change_b = false
         is_state_change_c = false
         widgetSet = null
-        future_a!!.cancel(false)
-        future_b!!.cancel(false)
+        futureA!!.cancel(false)
+        futureB!!.cancel(false)
     }
 
     /**
@@ -707,17 +704,17 @@ class MainFunctions(private val service: AccessibilityService) {
         val switch_music_control = view_main.findViewById<Switch>(R.id.music_control)
         val switch_record_message = view_main.findViewById<Switch>(R.id.record_message)
         val switch_screen_lightness = view_main.findViewById<Switch>(R.id.screen_lightness)
-        val switch_screen_lock = view_main.findViewById<Switch>(R.id.screen_lock)
-        val bt_set = view_main.findViewById<TextView>(R.id.set)
+        val switchScreenLock = view_main.findViewById<Switch>(R.id.screen_lock)
+        val btSetting = view_main.findViewById<TextView>(R.id.set)
         val bt_look = view_main.findViewById<TextView>(R.id.look)
         val bt_cancel = view_main.findViewById<TextView>(R.id.cancel)
         val bt_sure = view_main.findViewById<TextView>(R.id.sure)
-        switch_skip_advertising.isChecked = skip_advertising
+        switch_skip_advertising.isChecked = skipAdvertising
         switch_music_control.isChecked = control_music
         switch_record_message.isChecked = record_message
-        switch_screen_lightness.isChecked = control_lightness
-        switch_screen_lock.isChecked =
-            control_lock && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || devicePolicyManager!!.isAdminActive(
+        switch_screen_lightness.isChecked = controlLightness
+        switchScreenLock.isChecked =
+            controlLock && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || devicePolicyManager!!.isAdminActive(
                 componentName
             ))
         switch_skip_advertising.setOnLongClickListener(object : OnLongClickListener {
@@ -1326,7 +1323,7 @@ class MainFunctions(private val service: AccessibilityService) {
             val seekBar = view.findViewById<SeekBar>(R.id.strength)
             val checkLock = view.findViewById<CheckBox>(R.id.check_lock)
             seekBar.progress = vibration_strength
-            checkLock.isChecked = control_music_only_lock
+            checkLock.isChecked = controlMusicOnlyLock
             seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(
                     seekBar: SeekBar,
@@ -1343,7 +1340,7 @@ class MainFunctions(private val service: AccessibilityService) {
                 object : CompoundButton.OnCheckedChangeListener {
                     override fun onCheckedChanged(compoundButton: CompoundButton, b: Boolean) {
                         when (compoundButton.id) {
-                            R.id.check_lock -> control_music_only_lock = b
+                            R.id.check_lock -> controlMusicOnlyLock = b
                         }
                     }
                 }
@@ -1351,7 +1348,7 @@ class MainFunctions(private val service: AccessibilityService) {
             val dialog_vol = AlertDialog.Builder(service).setView(view)
                 .setOnDismissListener(object : DialogInterface.OnDismissListener {
                     override fun onDismiss(dialog: DialogInterface) {
-                        if (control_music_only_lock) {
+                        if (controlMusicOnlyLock) {
                             accessibilityServiceInfo!!.flags =
                                 accessibilityServiceInfo!!.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
                         } else if (control_music) {
@@ -1361,7 +1358,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         service.serviceInfo = accessibilityServiceInfo
                         sharedPreferences.edit()
                             .putInt(VIBRATION_STRENGTH, vibration_strength).putBoolean(
-                                CONTROL_MUSIC_ONLY_LOCK, control_music_only_lock
+                                CONTROL_MUSIC_ONLY_LOCK, controlMusicOnlyLock
                             ).apply()
                     }
                 }).create()
@@ -1391,7 +1388,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         override fun onClick(v: View) {
                             val view = inflater.inflate(R.layout.view_select, null)
                             val listView = view.findViewById<ListView>(R.id.listView)
-                            val list = packageManager!!.queryIntentActivities(
+                            val list = packageManager.queryIntentActivities(
                                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
                                 PackageManager.MATCH_ALL
                             )
@@ -1401,7 +1398,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                 listApp.add(
                                     AppInformation(
                                         info.packageName,
-                                        packageManager!!.getApplicationLabel(info).toString(),
+                                        packageManager.getApplicationLabel(info).toString(),
                                         info.loadIcon(packageManager)
                                     )
                                 )
@@ -1533,12 +1530,12 @@ class MainFunctions(private val service: AccessibilityService) {
             dialog_main.dismiss()
             true
         }
-        switch_screen_lock.setOnLongClickListener {
+        switchScreenLock.setOnLongClickListener {
             screenLock!!.showSetAreaDialog()
             dialog_main.dismiss()
             true
         }
-        switch_screen_lock.setOnCheckedChangeListener { _, isChecked ->
+        switchScreenLock.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked && !devicePolicyManager!!.isAdminActive(componentName) && (Build.VERSION.SDK_INT < Build.VERSION_CODES.P)) {
                 val intent = Intent().setComponent(
                     ComponentName(
@@ -1548,11 +1545,11 @@ class MainFunctions(private val service: AccessibilityService) {
                 )
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 service.startActivity(intent)
-                control_lock = false
+                controlLock = false
                 dialog_main.dismiss()
             }
         }
-        bt_set.setOnClickListener {
+        btSetting.setOnClickListener {
             val intent = Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse(
                     "package:$packageName"
@@ -1573,14 +1570,14 @@ class MainFunctions(private val service: AccessibilityService) {
             if (switch_skip_advertising.isChecked) {
                 accessibilityServiceInfo!!.eventTypes =
                     accessibilityServiceInfo!!.eventTypes or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                skip_advertising = true
+                skipAdvertising = true
             } else {
                 accessibilityServiceInfo!!.eventTypes =
                     accessibilityServiceInfo!!.eventTypes and (AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).inv()
-                skip_advertising = false
+                skipAdvertising = false
             }
             if (switch_music_control.isChecked) {
-                if (!control_music_only_lock) {
+                if (!controlMusicOnlyLock) {
                     accessibilityServiceInfo!!.flags =
                         accessibilityServiceInfo!!.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                 }
@@ -1600,34 +1597,34 @@ class MainFunctions(private val service: AccessibilityService) {
                 record_message = false
             }
             if (switch_screen_lightness.isChecked) {
-                if (!control_lightness) {
+                if (!controlLightness) {
                     screenLightness!!.showFloat()
-                    control_lightness = true
+                    controlLightness = true
                 }
             } else {
-                if (control_lightness) {
+                if (controlLightness) {
                     screenLightness!!.dismiss()
-                    control_lightness = false
+                    controlLightness = false
                 }
             }
-            if (switch_screen_lock.isChecked) {
-                if (!control_lock) {
+            if (switchScreenLock.isChecked) {
+                if (!controlLock) {
                     screenLock!!.showLockFloat()
-                    control_lock = true
+                    controlLock = true
                 }
             } else {
-                if (control_lock) {
+                if (controlLock) {
                     screenLock!!.dismiss()
-                    control_lock = false
+                    controlLock = false
                 }
             }
             service.serviceInfo = accessibilityServiceInfo
-            sharedPreferences.edit().putBoolean(SKIP_ADVERTISING, skip_advertising)
+            sharedPreferences.edit().putBoolean(SKIP_ADVERTISING, skipAdvertising)
                 .putBoolean(
                     CONTROL_MUSIC, control_music
                 ).putBoolean(RECORD_MESSAGE, record_message).putBoolean(
-                    CONTROL_LIGHTNESS, control_lightness
-                ).putBoolean(CONTROL_LOCK, control_lock).apply()
+                    CONTROL_LIGHTNESS, controlLightness
+                ).putBoolean(CONTROL_LOCK, controlLock).apply()
             dialog_main.dismiss()
         }
         val win = dialog_main.window
