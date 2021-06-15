@@ -1,4 +1,4 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.receiver
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context

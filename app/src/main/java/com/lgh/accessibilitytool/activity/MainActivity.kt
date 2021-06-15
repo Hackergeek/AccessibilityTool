@@ -1,4 +1,4 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.activity
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -10,6 +10,9 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import com.lgh.accessibilitytool.MainFunctions
+import com.lgh.accessibilitytool.service.GestureAccessibilityService
+import com.lgh.accessibilitytool.service.NoGestureAccessibilityService
 
 class MainActivity : Activity() {
     @SuppressLint("BatteryLife")
@@ -17,23 +20,24 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         try {
             val context = applicationContext
-            if (MyAccessibilityService.mainFunctions == null && MyAccessibilityServiceNoGesture.Companion.mainFunctions == null) {
+            if (GestureAccessibilityService.mainFunctions == null && NoGestureAccessibilityService.mainFunctions == null) {
                 val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
                 Toast.makeText(context, "请打开其中一个无障碍服务", Toast.LENGTH_SHORT).show()
-            } else if (MyAccessibilityService.mainFunctions != null && MyAccessibilityServiceNoGesture.Companion.mainFunctions != null) {
+            } else if (GestureAccessibilityService.mainFunctions != null && NoGestureAccessibilityService.mainFunctions != null) {
                 val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
                 Toast.makeText(context, "无障碍服务冲突，请关闭其中一个", Toast.LENGTH_SHORT).show()
             } else {
-                if (MyAccessibilityService.mainFunctions != null) {
-                    MyAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(0x00)
+                if (GestureAccessibilityService.mainFunctions != null) {
+                    GestureAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(MainFunctions.MESSAGE_MAIN_UI)
+                    return
                 }
-                if (MyAccessibilityServiceNoGesture.mainFunctions != null) {
-                    MyAccessibilityServiceNoGesture.mainFunctions!!.handler!!.sendEmptyMessage(
-                        0x00
+                if (NoGestureAccessibilityService.mainFunctions != null) {
+                    NoGestureAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(
+                        MainFunctions.MESSAGE_MAIN_UI
                     )
                 }
             }

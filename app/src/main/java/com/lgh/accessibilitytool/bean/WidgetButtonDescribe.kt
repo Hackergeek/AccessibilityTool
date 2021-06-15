@@ -1,4 +1,4 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.bean
 
 import android.graphics.Rect
 import java.util.*

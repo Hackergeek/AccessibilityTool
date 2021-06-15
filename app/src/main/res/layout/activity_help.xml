@@ -6,7 +6,7 @@
     android:background="#ffffffff"
     android:gravity="center"
     android:orientation="vertical"
-    tools:context=".HelpActivity">
+    tools:context=".activity.HelpActivity">
 
     <WebView
         android:id="@+id/webView"

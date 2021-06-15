@@ -1,4 +1,4 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.activity
 
 import android.app.Activity
 import android.content.Intent
@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.LinearLayout
+import com.lgh.accessibilitytool.R
 
 class HelpActivity : Activity() {
     private lateinit var sharedPreferences: SharedPreferences

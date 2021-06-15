@@ -1,12 +1,13 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.res.Configuration
 import android.view.*
 import android.view.accessibility.AccessibilityEvent
+import com.lgh.accessibilitytool.MainFunctions
 
-class MyAccessibilityServiceNoGesture : AccessibilityService() {
+class GestureAccessibilityService : AccessibilityService() {
     private var createNum: Int = 0
     private var connectNum: Int = 0
     override fun onCreate() {
@@ -27,8 +28,9 @@ class MyAccessibilityServiceNoGesture : AccessibilityService() {
         }
         mainFunctions = MainFunctions(this)
         mainFunctions!!.onServiceConnected()
-        if (mainFunctions != null) {
-            mainFunctions!!.handler!!.sendEmptyMessage(0x04)
+        //停止MyAccessibilityServiceNoGesture辅助性服务
+        if (NoGestureAccessibilityService.mainFunctions != null) {
+            NoGestureAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(MainFunctions.MESSAGE_DISABLE_SELF)
         }
     }
 

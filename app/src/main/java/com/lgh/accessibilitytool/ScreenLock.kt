@@ -3,12 +3,15 @@ package com.lgh.accessibilitytool
 import android.app.AlertDialog
 import android.app.admin.DevicePolicyManager
 import android.content.*
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.*
 import android.widget.*
 import android.widget.SeekBar.OnSeekBarChangeListener
+import com.lgh.accessibilitytool.service.GestureAccessibilityService
+import com.lgh.accessibilitytool.service.NoGestureAccessibilityService
 
 class ScreenLock constructor(private val context: Context) {
     private var width: Int
@@ -37,21 +40,22 @@ class ScreenLock constructor(private val context: Context) {
         params!!.x = px
         params!!.y = py
         imageView = ImageView(context)
-        imageView!!.setBackgroundColor(0x00000000)
+        imageView!!.setImageResource(R.drawable.launch)
+        imageView!!.setBackgroundColor(Color.BLACK)
         val clickListener: View.OnClickListener = object : View.OnClickListener {
             var start: Long = System.currentTimeMillis()
             override fun onClick(v: View) {
                 val end: Long = System.currentTimeMillis()
                 if ((end - start) < 800) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        if (MyAccessibilityService.mainFunctions != null) {
-                            MyAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(
-                                0x01
+                        if (GestureAccessibilityService.mainFunctions != null) {
+                            GestureAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(
+                                MainFunctions.MESSAGE_LOCK_SCREEN
                             )
                         }
-                        if (MyAccessibilityServiceNoGesture.mainFunctions != null) {
-                            MyAccessibilityServiceNoGesture.mainFunctions!!.handler!!.sendEmptyMessage(
-                                0x01
+                        if (NoGestureAccessibilityService.mainFunctions != null) {
+                            NoGestureAccessibilityService.mainFunctions!!.handler!!.sendEmptyMessage(
+                                MainFunctions.MESSAGE_LOCK_SCREEN
                             )
                         }
                     } else {
@@ -158,8 +162,8 @@ class ScreenLock constructor(private val context: Context) {
 
     init {
         windowManager.defaultDisplay.getRealMetrics(metrics)
-        width = sharedPreferences.getInt(WIDTH, metrics.widthPixels / 20)
-        height = sharedPreferences.getInt(HEIGHT, metrics.widthPixels / 20)
+        width = sharedPreferences.getInt(WIDTH, metrics.widthPixels)
+        height = sharedPreferences.getInt(HEIGHT, metrics.widthPixels)
         px = sharedPreferences.getInt(POSITION_X, metrics.widthPixels - width)
         py = sharedPreferences.getInt(POSITION_Y, metrics.heightPixels - height)
     }

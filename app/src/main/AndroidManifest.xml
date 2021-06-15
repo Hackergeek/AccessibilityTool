@@ -19,7 +19,7 @@
         android:supportsRtl="true">
 
         <receiver
-            android:name=".ScreenOffReceiver"
+            android:name=".receiver.ScreenOffReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -28,7 +28,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".PackageChangeReceiver"
+            android:name=".receiver.PackageChangeReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -38,7 +38,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".DeviceAdminReceiver"
+            android:name=".receiver.DeviceAdminReceiver"
             android:description="@string/app_name"
             android:enabled="true"
             android:exported="true"
@@ -53,7 +53,7 @@
         </receiver>
 
         <service
-            android:name=".MyAccessibilityService"
+            android:name=".service.GestureAccessibilityService"
             android:enabled="true"
             android:exported="true"
             android:label="@string/accessibilityName"
@@ -64,11 +64,11 @@
 
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/configure" />
+                android:resource="@xml/gesture_accessibility_configuration" />
         </service>
 
-  <!--      <service
-            android:name=".MyAccessibilityServiceNoGesture"
+        <service
+            android:name=".service.NoGestureAccessibilityService"
             android:enabled="true"
             android:exported="true"
             android:label="@string/accessibilityNameNoGesture"
@@ -79,11 +79,11 @@
 
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/configurenogesture" />
-        </service>-->
+                android:resource="@xml/no_gesture_accessibility_configuration" />
+        </service>
 
         <activity
-            android:name=".MainActivity"
+            android:name=".activity.MainActivity"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
             android:theme="@android:style/Theme.NoDisplay">
@@ -93,7 +93,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".HelpActivity"
+            android:name=".activity.HelpActivity"
             android:launchMode="singleInstance"
             android:theme="@style/AppTheme"/>
     </application>

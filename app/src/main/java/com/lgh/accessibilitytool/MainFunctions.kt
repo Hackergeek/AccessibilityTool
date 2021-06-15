@@ -35,6 +35,12 @@ import android.widget.AdapterView.OnItemClickListener
 import android.widget.SeekBar.OnSeekBarChangeListener
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.lgh.accessibilitytool.activity.HelpActivity
+import com.lgh.accessibilitytool.bean.SkipPositionDescribe
+import com.lgh.accessibilitytool.bean.WidgetButtonDescribe
+import com.lgh.accessibilitytool.receiver.DeviceAdminReceiver
+import com.lgh.accessibilitytool.receiver.PackageChangeReceiver
+import com.lgh.accessibilitytool.receiver.ScreenOffReceiver
 import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -49,11 +55,31 @@ class MainFunctions(private val service: AccessibilityService) {
     private var doublePress = false
     private var isReleaseUp = false
     private var isReleaseDown = false
-    private var skipAdvertising = false
-    private var record_message = false
+
+    /**
+     * 跳过开屏广告
+     */
+    private var skipAdvertisingEnable = false
+
+    /**
+     * 音量键切换音频
+     */
+    private var controlMusicEnable = false
+
+    /**
+     * 记录通知消息
+     */
+    private var recordNotificationEnable = false
+
+    /**
+     * 调节屏幕亮度
+     */
     private var controlLightness = false
+
+    /**
+     * 双击屏幕锁屏
+     */
     private var controlLock = false
-    private var control_music = false
     private var controlMusicOnlyLock = false
     private var is_state_change_a = false
     private var is_state_change_b = false
@@ -84,7 +110,7 @@ class MainFunctions(private val service: AccessibilityService) {
     private var cur_act: String? = null
     private var savePath: String? = null
     private lateinit var packageName: String
-    private var windowManager: WindowManager? = null
+    private lateinit var windowManager: WindowManager
     private var devicePolicyManager: DevicePolicyManager? = null
     private var screenLightness: ScreenLightness? = null
     private var simulateMediaButton: SimulateMediaButton? = null
@@ -98,6 +124,7 @@ class MainFunctions(private val service: AccessibilityService) {
     private var adView: View? = null
     private var windowLayout: View? = null
     private var imageView: ImageView? = null
+
     fun onServiceConnected() {
         try {
             isReleaseUp = true
@@ -125,10 +152,13 @@ class MainFunctions(private val service: AccessibilityService) {
             screenOnReceiver = ScreenOffReceiver()
             vibration_strength = sharedPreferences.getInt(VIBRATION_STRENGTH, 50)
             pac_msg = sharedPreferences.getStringSet(PAC_MSG, HashSet())
-            whitePackageList = sharedPreferences.getStringSet(PAC_WHITE, mutableSetOf<String>()) as MutableSet<String>
-            skipAdvertising = sharedPreferences.getBoolean(SKIP_ADVERTISING, true)
-            control_music = sharedPreferences.getBoolean(CONTROL_MUSIC, true)
-            record_message = sharedPreferences.getBoolean(RECORD_MESSAGE, false)
+            whitePackageList = sharedPreferences.getStringSet(
+                PAC_WHITE,
+                mutableSetOf<String>()
+            ) as MutableSet<String>
+            skipAdvertisingEnable = sharedPreferences.getBoolean(SKIP_ADVERTISING, true)
+            controlMusicEnable = sharedPreferences.getBoolean(CONTROL_MUSIC, true)
+            recordNotificationEnable = sharedPreferences.getBoolean(RECORD_MESSAGE, false)
             controlLightness = sharedPreferences.getBoolean(CONTROL_LIGHTNESS, false)
             controlLock = sharedPreferences.getBoolean(
                 CONTROL_LOCK,
@@ -150,16 +180,16 @@ class MainFunctions(private val service: AccessibilityService) {
             screenIntent.addAction(Intent.ACTION_SCREEN_OFF)
             service.registerReceiver(screenOnReceiver, screenIntent)
             savePath = service.externalCacheDir!!.absolutePath
-            if (skipAdvertising) {
+            if (skipAdvertisingEnable) {
                 (accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).also {
                     accessibilityServiceInfo.eventTypes = it
                 }
             }
-            if (control_music && !controlMusicOnlyLock) {
+            if (controlMusicEnable && !controlMusicOnlyLock) {
                 accessibilityServiceInfo.flags =
                     accessibilityServiceInfo.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
             }
-            if (record_message) {
+            if (recordNotificationEnable) {
                 accessibilityServiceInfo.eventTypes =
                     accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
             }
@@ -198,23 +228,23 @@ class MainFunctions(private val service: AccessibilityService) {
             futureV = futureA
             handler = Handler { msg ->
                 when (msg.what) {
-                    0x00 -> mainUI()
-                    0x01 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    MESSAGE_MAIN_UI -> mainUI()
+                    MESSAGE_LOCK_SCREEN -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
                     }
-                    0x02 -> updatePackage()
+                    MESSAGE_REFRESH_PACKAGE -> updatePackage()
                     0x03 -> {
                         cur_pac = "ScreenOff PackageName"
-                        if (control_music && controlMusicOnlyLock) {
+                        if (controlMusicEnable && controlMusicOnlyLock) {
                             accessibilityServiceInfo.flags =
                                 accessibilityServiceInfo.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                             service.serviceInfo = accessibilityServiceInfo
                         }
                     }
-                    0x04 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    MESSAGE_DISABLE_SELF -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         service.disableSelf()
                     }
-                    0x05 -> if (control_music && controlMusicOnlyLock) {
+                    0x05 -> if (controlMusicEnable && controlMusicOnlyLock) {
                         accessibilityServiceInfo.flags =
                             accessibilityServiceInfo.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
                         service.serviceInfo = accessibilityServiceInfo
@@ -250,18 +280,18 @@ class MainFunctions(private val service: AccessibilityService) {
                                 is_state_change_c = true
                                 win_state_count = 0
                                 widgetSet = null
-                                futureA = executorService!!.schedule({
+                                futureA = executorService.schedule({
                                     is_state_change_a = false
                                     is_state_change_c = false
                                 }, 8000, TimeUnit.MILLISECONDS)
-                                futureB = executorService!!.schedule({
-                                    accessibilityServiceInfo!!.eventTypes =
-                                        accessibilityServiceInfo!!.eventTypes and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED.inv()
+                                futureB = executorService.schedule({
+                                    accessibilityServiceInfo.eventTypes =
+                                        accessibilityServiceInfo.eventTypes and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED.inv()
                                     service.serviceInfo = accessibilityServiceInfo
                                     is_state_change_b = false
                                     widgetSet = null
                                 }, 30000, TimeUnit.MILLISECONDS)
-                            } else if (whitePackageList!!.contains(packageName)) {
+                            } else if (whitePackageList.contains(packageName)) {
                                 cur_pac = packageName
                                 if (is_state_change_a || is_state_change_b || is_state_change_c) {
                                     closeContentChanged()
@@ -281,7 +311,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                     is_state_change_a = false
                                     is_state_change_c = false
                                     futureA!!.cancel(false)
-                                    executorService!!.scheduleAtFixedRate(
+                                    executorService.scheduleAtFixedRate(
                                         object : Runnable {
                                             var num = 0
                                             override fun run() {
@@ -350,6 +380,72 @@ class MainFunctions(private val service: AccessibilityService) {
                         writer.close()
                     }
                 }
+                AccessibilityEvent.TYPE_ANNOUNCEMENT -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_ASSIST_READING_CONTEXT -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_GESTURE_DETECTION_END -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_GESTURE_DETECTION_START -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_END -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_START -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_CONTEXT_CLICKED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_HOVER_ENTER -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_HOVER_EXIT -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_SELECTED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY -> {
+                    TODO()
+                }
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+                    TODO()
+                }
             }
         } catch (e: Throwable) {
             e.printStackTrace()
@@ -370,10 +466,10 @@ class MainFunctions(private val service: AccessibilityService) {
                                     executorService.schedule({ //                                        Log.i(TAG,"KeyEvent.KEYCODE_VOLUME_UP -> THREAD");
                                         if (!isReleaseDown) {
                                             simulateMediaButton!!.sendMediaButton(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                                            vibrator!!.vibrate(vibration_strength.toLong())
-                                        } else if (!isReleaseUp && audioManager!!.isMusicActive) {
+                                            vibrator.vibrate(vibration_strength.toLong())
+                                        } else if (!isReleaseUp && audioManager.isMusicActive) {
                                             simulateMediaButton!!.sendMediaButton(KeyEvent.KEYCODE_MEDIA_NEXT)
-                                            vibrator!!.vibrate(vibration_strength.toLong())
+                                            vibrator.vibrate(vibration_strength.toLong())
                                         }
                                     }, 800, TimeUnit.MILLISECONDS)
                             } else {
@@ -451,13 +547,13 @@ class MainFunctions(private val service: AccessibilityService) {
             }
             if (adView != null && imageView != null && windowLayout != null) {
                 val metrics = DisplayMetrics()
-                windowManager!!.defaultDisplay.getRealMetrics(metrics)
+                windowManager.defaultDisplay.getRealMetrics(metrics)
                 cParams!!.x = (metrics.widthPixels - cParams!!.width) / 2
                 cParams!!.y = (metrics.heightPixels - cParams!!.height) / 2
                 aParams!!.x = (metrics.widthPixels - aParams!!.width) / 2
                 aParams!!.y = metrics.heightPixels - aParams!!.height
-                windowManager!!.updateViewLayout(adView, aParams)
-                windowManager!!.updateViewLayout(imageView, cParams)
+                windowManager.updateViewLayout(adView, aParams)
+                windowManager.updateViewLayout(imageView, cParams)
                 val layout = windowLayout!!.findViewById<FrameLayout>(R.id.frame)
                 layout.removeAllViews()
                 val text = TextView(service)
@@ -493,20 +589,20 @@ class MainFunctions(private val service: AccessibilityService) {
      */
     private fun findSkipButtonByText(nodeInfo: AccessibilityNodeInfo?) {
         if (nodeInfo == null) return
-        for (n in keyWordList!!.indices) {
+        for (index in keyWordList!!.indices) {
             val list = nodeInfo.findAccessibilityNodeInfosByText(
-                keyWordList!![n]
+                keyWordList!![index]
             )
-            if (!list.isEmpty()) {
-                for (e: AccessibilityNodeInfo in list) {
-                    if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                        if (!e.parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            if (list.isNotEmpty()) {
+                for (accessibilityNodeInfo: AccessibilityNodeInfo in list) {
+                    if (!accessibilityNodeInfo.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        if (!accessibilityNodeInfo.parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                             val rect = Rect()
-                            e.getBoundsInScreen(rect)
+                            accessibilityNodeInfo.getBoundsInScreen(rect)
                             click(rect.centerX(), rect.centerY(), 0, 20)
                         }
                     }
-                    e.recycle()
+                    accessibilityNodeInfo.recycle()
                 }
                 is_state_change_c = false
                 return
@@ -600,7 +696,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     tem.add(e.getChild(n))
                 }
             }
-            if (!tem.isEmpty()) {
+            if (tem.isNotEmpty()) {
                 findAllNode(tem, list)
             }
         } catch (e: Throwable) {
@@ -631,8 +727,8 @@ class MainFunctions(private val service: AccessibilityService) {
      * 事件的响应
      */
     private fun closeContentChanged() {
-        accessibilityServiceInfo!!.eventTypes =
-            accessibilityServiceInfo!!.eventTypes and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED.inv()
+        accessibilityServiceInfo.eventTypes =
+            accessibilityServiceInfo.eventTypes and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED.inv()
         service.serviceInfo = accessibilityServiceInfo
         is_state_change_a = false
         is_state_change_b = false
@@ -653,7 +749,7 @@ class MainFunctions(private val service: AccessibilityService) {
         val systemPackageSet: MutableSet<String> = HashSet()
         var intent: Intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         var resolveInfoList: List<ResolveInfo> =
-            packageManager!!.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+            packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)
         for (e in resolveInfoList) {
             launchPackageSet.add(e.activityInfo.packageName)
             if (e.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == ApplicationInfo.FLAG_SYSTEM) {
@@ -661,7 +757,7 @@ class MainFunctions(private val service: AccessibilityService) {
             }
         }
         intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        resolveInfoList = packageManager!!.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+        resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)
         for (e in resolveInfoList) {
             homePackageList.add(e.activityInfo.packageName)
         }
@@ -681,7 +777,7 @@ class MainFunctions(private val service: AccessibilityService) {
         whitePackageList.removeAll(removePackageList)
         whitePackageList.addAll(homePackageList)
         whitePackageList.add("com.android.packageinstaller")
-        launchPackageSet.removeAll(whitePackageList!!)
+        launchPackageSet.removeAll(whitePackageList)
         launchPackageSet.removeAll(removePackageList)
     }
 
@@ -690,34 +786,34 @@ class MainFunctions(private val service: AccessibilityService) {
      */
     private fun mainUI() {
         val metrics = DisplayMetrics()
-        windowManager!!.defaultDisplay.getRealMetrics(metrics)
+        windowManager.defaultDisplay.getRealMetrics(metrics)
         val componentName = ComponentName(service, DeviceAdminReceiver::class.java)
         val b = metrics.heightPixels > metrics.widthPixels
         val width = if (b) metrics.widthPixels else metrics.heightPixels
         val height = if (b) metrics.heightPixels else metrics.widthPixels
         val inflater = LayoutInflater.from(service)
-        val view_main = inflater.inflate(R.layout.main_dialog, null)
-        val dialog_main =
+        val mainRootView = inflater.inflate(R.layout.main_dialog, null)
+        val mainDialog =
             AlertDialog.Builder(service).setTitle(R.string.simple_name).setIcon(R.drawable.a)
-                .setCancelable(false).setView(view_main).create()
-        val switch_skip_advertising = view_main.findViewById<Switch>(R.id.skip_advertising)
-        val switch_music_control = view_main.findViewById<Switch>(R.id.music_control)
-        val switch_record_message = view_main.findViewById<Switch>(R.id.record_message)
-        val switch_screen_lightness = view_main.findViewById<Switch>(R.id.screen_lightness)
-        val switchScreenLock = view_main.findViewById<Switch>(R.id.screen_lock)
-        val btSetting = view_main.findViewById<TextView>(R.id.set)
-        val bt_look = view_main.findViewById<TextView>(R.id.look)
-        val bt_cancel = view_main.findViewById<TextView>(R.id.cancel)
-        val bt_sure = view_main.findViewById<TextView>(R.id.sure)
-        switch_skip_advertising.isChecked = skipAdvertising
-        switch_music_control.isChecked = control_music
-        switch_record_message.isChecked = record_message
-        switch_screen_lightness.isChecked = controlLightness
-        switchScreenLock.isChecked =
+                .setCancelable(false).setView(mainRootView).create()
+        val skipAdvertisingSwitch = mainRootView.findViewById<Switch>(R.id.skip_advertising)
+        val musicControlSwitch = mainRootView.findViewById<Switch>(R.id.music_control)
+        val recordNotificationSwitch = mainRootView.findViewById<Switch>(R.id.record_notification)
+        val screenLightnessSwitch = mainRootView.findViewById<Switch>(R.id.screen_lightness)
+        val screenLockSwitch = mainRootView.findViewById<Switch>(R.id.screen_lock)
+        val btSetting = mainRootView.findViewById<TextView>(R.id.set)
+        val btHelp = mainRootView.findViewById<TextView>(R.id.bt_help)
+        val btCancel = mainRootView.findViewById<TextView>(R.id.cancel)
+        val btSure = mainRootView.findViewById<TextView>(R.id.sure)
+        skipAdvertisingSwitch.isChecked = skipAdvertisingEnable
+        musicControlSwitch.isChecked = controlMusicEnable
+        recordNotificationSwitch.isChecked = recordNotificationEnable
+        screenLightnessSwitch.isChecked = controlLightness
+        screenLockSwitch.isChecked =
             controlLock && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || devicePolicyManager!!.isAdminActive(
                 componentName
             ))
-        switch_skip_advertising.setOnLongClickListener(object : OnLongClickListener {
+        skipAdvertisingSwitch.setOnLongClickListener(object : OnLongClickListener {
             override fun onLongClick(v: View): Boolean {
                 val view = inflater.inflate(R.layout.skipdesc_parent, null)
                 val dialog_adv = AlertDialog.Builder(service).setView(view).create()
@@ -752,11 +848,11 @@ class MainFunctions(private val service: AccessibilityService) {
                     delay.setText(value.delay.toString())
                     period.setText(value.period.toString())
                     number.setText(value.number.toString())
-                    delete.setOnClickListener(View.OnClickListener {
+                    delete.setOnClickListener(OnClickListener {
                         act_position!!.remove(value.activityName)
                         parentView.removeView(childView)
                     })
-                    sure.setOnClickListener(object : View.OnClickListener {
+                    sure.setOnClickListener(object : OnClickListener {
                         override fun onClick(v: View) {
                             val sX = x.text.toString()
                             val sY = y.text.toString()
@@ -828,7 +924,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         widgetText.setText(widget.text)
                         onlyClick.isChecked = widget.onlyClick
                         parentView.addView(childView)
-                        delete.setOnClickListener(object : View.OnClickListener {
+                        delete.setOnClickListener(object : OnClickListener {
                             override fun onClick(v: View) {
                                 widgets.remove(widget)
                                 parentView.removeView(childView)
@@ -837,7 +933,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                 }
                             }
                         })
-                        sure.setOnClickListener(object : View.OnClickListener {
+                        sure.setOnClickListener(object : OnClickListener {
                             override fun onClick(v: View) {
                                 widget.idName = widgetId.text.toString().trim { it <= ' ' }
                                 widget.describe = widgetDescribe.text.toString().trim { it <= ' ' }
@@ -853,7 +949,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         })
                     }
                 }
-                chooseButton.setOnClickListener(object : View.OnClickListener {
+                chooseButton.setOnClickListener(object : OnClickListener {
                     override fun onClick(v: View) {
                         val view = inflater.inflate(R.layout.view_select, null)
                         val listView = view.findViewById<ListView>(R.id.listView)
@@ -966,7 +1062,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         }
                     }
                 })
-                addButton.setOnClickListener(object : View.OnClickListener {
+                addButton.setOnClickListener(object : OnClickListener {
                     var widgetDescribe: WidgetButtonDescribe? = null
                     var positionDescribe: SkipPositionDescribe? = null
 
@@ -1080,7 +1176,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                 return true
                             }
                         })
-                        switchWid?.setOnClickListener(object : View.OnClickListener {
+                        switchWid?.setOnClickListener(object : OnClickListener {
                             override fun onClick(v: View) {
                                 val button = v as Button
                                 if (bParams!!.alpha == 0f) {
@@ -1092,9 +1188,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                     roots.add(root)
                                     val nodeList = ArrayList<AccessibilityNodeInfo>()
                                     findAllNode(roots, nodeList)
-                                    Collections.sort(
-                                        nodeList
-                                    ) { a, b ->
+                                    nodeList.sortWith { a, b ->
                                         val rectA = Rect()
                                         val rectB = Rect()
                                         a.getBoundsInScreen(rectA)
@@ -1115,13 +1209,9 @@ class MainFunctions(private val service: AccessibilityService) {
                                         )
                                         img.setBackgroundResource(R.drawable.node)
                                         img.isFocusableInTouchMode = true
-                                        img.setOnClickListener(object : View.OnClickListener {
-                                            override fun onClick(v: View) {
-                                                v.requestFocus()
-                                            }
-                                        })
-                                        img.onFocusChangeListener = object : OnFocusChangeListener {
-                                            override fun onFocusChange(v: View, hasFocus: Boolean) {
+                                        img.setOnClickListener { v -> v.requestFocus() }
+                                        img.onFocusChangeListener =
+                                            OnFocusChangeListener { v, hasFocus ->
                                                 if (hasFocus) {
                                                     widgetDescribe!!.bonus = temRect
                                                     widgetDescribe!!.clickable = e.isClickable
@@ -1150,7 +1240,6 @@ class MainFunctions(private val service: AccessibilityService) {
                                                     v.setBackgroundResource(R.drawable.node)
                                                 }
                                             }
-                                        }
                                         layout_add?.addView(img, params)
                                     }
                                     bParams!!.alpha = 0.5f
@@ -1170,29 +1259,27 @@ class MainFunctions(private val service: AccessibilityService) {
                                 }
                             }
                         })
-                        switchAim?.setOnClickListener(object : View.OnClickListener {
-                            override fun onClick(v: View) {
-                                val button = v as Button
-                                if (cParams!!.alpha == 0f) {
-                                    positionDescribe!!.packageName = (cur_pac)!!
-                                    positionDescribe!!.activityName = (cur_act)!!
-                                    cParams!!.alpha = 0.5f
-                                    cParams!!.flags =
-                                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                    windowManager!!.updateViewLayout(imageView, cParams)
-                                    pacName?.text = positionDescribe!!.packageName
-                                    actName?.text = positionDescribe!!.activityName
-                                    button.text = "隐藏准心"
-                                } else {
-                                    cParams!!.alpha = 0f
-                                    cParams!!.flags =
-                                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                                    windowManager!!.updateViewLayout(imageView, cParams)
-                                    savePositionButton?.isEnabled = false
-                                    button.text = "显示准心"
-                                }
+                        switchAim?.setOnClickListener { v ->
+                            val button = v as Button
+                            if (cParams!!.alpha == 0f) {
+                                positionDescribe!!.packageName = (cur_pac)!!
+                                positionDescribe!!.activityName = (cur_act)!!
+                                cParams!!.alpha = 0.5f
+                                cParams!!.flags =
+                                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                windowManager!!.updateViewLayout(imageView, cParams)
+                                pacName?.text = positionDescribe!!.packageName
+                                actName?.text = positionDescribe!!.activityName
+                                button.text = "隐藏准心"
+                            } else {
+                                cParams!!.alpha = 0f
+                                cParams!!.flags =
+                                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                                windowManager!!.updateViewLayout(imageView, cParams)
+                                savePositionButton?.isEnabled = false
+                                button.text = "显示准心"
                             }
-                        })
+                        }
                         saveWidgetButton?.setOnClickListener {
                             val temWidget = WidgetButtonDescribe(
                                 widgetDescribe!!
@@ -1252,7 +1339,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                     .apply()
                             }
                         }).create()
-                    button.setOnClickListener(object : View.OnClickListener {
+                    button.setOnClickListener(object : OnClickListener {
                         override fun onClick(v: View) {
                             val input = edit.text.toString()
                             if (!input.isEmpty()) {
@@ -1263,7 +1350,7 @@ class MainFunctions(private val service: AccessibilityService) {
                                     text.text = input
                                     layout.addView(itemView)
                                     keyWordList!!.add(input)
-                                    rm.setOnClickListener(object : View.OnClickListener {
+                                    rm.setOnClickListener(object : OnClickListener {
                                         override fun onClick(v: View) {
                                             keyWordList!!.remove(text.text.toString())
                                             layout.removeView(itemView)
@@ -1280,7 +1367,7 @@ class MainFunctions(private val service: AccessibilityService) {
                         val rm = itemView.findViewById<TextView>(R.id.remove)
                         text.text = e
                         layout.addView(itemView)
-                        rm.setOnClickListener(object : View.OnClickListener {
+                        rm.setOnClickListener(object : OnClickListener {
                             override fun onClick(v: View) {
                                 keyWordList!!.remove(text.text.toString())
                                 layout.removeView(itemView)
@@ -1314,11 +1401,11 @@ class MainFunctions(private val service: AccessibilityService) {
                 val params = win.attributes
                 params.width = width
                 win.attributes = params
-                dialog_main.dismiss()
+                mainDialog.dismiss()
                 return true
             }
         })
-        switch_music_control.setOnLongClickListener {
+        musicControlSwitch.setOnLongClickListener {
             val view = inflater.inflate(R.layout.control_music_set, null)
             val seekBar = view.findViewById<SeekBar>(R.id.strength)
             val checkLock = view.findViewById<CheckBox>(R.id.check_lock)
@@ -1346,22 +1433,20 @@ class MainFunctions(private val service: AccessibilityService) {
                 }
             checkLock.setOnCheckedChangeListener(onCheckedChangeListener)
             val dialog_vol = AlertDialog.Builder(service).setView(view)
-                .setOnDismissListener(object : DialogInterface.OnDismissListener {
-                    override fun onDismiss(dialog: DialogInterface) {
-                        if (controlMusicOnlyLock) {
-                            accessibilityServiceInfo!!.flags =
-                                accessibilityServiceInfo!!.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
-                        } else if (control_music) {
-                            accessibilityServiceInfo!!.flags =
-                                accessibilityServiceInfo!!.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-                        }
-                        service.serviceInfo = accessibilityServiceInfo
-                        sharedPreferences.edit()
-                            .putInt(VIBRATION_STRENGTH, vibration_strength).putBoolean(
-                                CONTROL_MUSIC_ONLY_LOCK, controlMusicOnlyLock
-                            ).apply()
+                .setOnDismissListener {
+                    if (controlMusicOnlyLock) {
+                        accessibilityServiceInfo!!.flags =
+                            accessibilityServiceInfo!!.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
+                    } else if (controlMusicEnable) {
+                        accessibilityServiceInfo!!.flags =
+                            accessibilityServiceInfo!!.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                     }
-                }).create()
+                    service.serviceInfo = accessibilityServiceInfo
+                    sharedPreferences.edit()
+                        .putInt(VIBRATION_STRENGTH, vibration_strength).putBoolean(
+                            CONTROL_MUSIC_ONLY_LOCK, controlMusicOnlyLock
+                        ).apply()
+                }.create()
             val win = dialog_vol.window
             win!!.setBackgroundDrawableResource(R.drawable.dialogbackground)
             win.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
@@ -1370,10 +1455,10 @@ class MainFunctions(private val service: AccessibilityService) {
             val params = win.attributes
             params.width = (width / 6) * 5
             win.attributes = params
-            dialog_main.dismiss()
+            mainDialog.dismiss()
             true
         }
-        switch_record_message.setOnLongClickListener(object : OnLongClickListener {
+        recordNotificationSwitch.setOnLongClickListener(object : OnLongClickListener {
             override fun onLongClick(v: View): Boolean {
                 try {
                     val file = File("$savePath/NotificationMessageCache.txt")
@@ -1384,7 +1469,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     val but_empty = view.findViewById<TextView>(R.id.empty)
                     val but_cancel = view.findViewById<TextView>(R.id.cancel)
                     val but_sure = view.findViewById<TextView>(R.id.sure)
-                    but_choose.setOnClickListener(object : View.OnClickListener {
+                    but_choose.setOnClickListener(object : OnClickListener {
                         override fun onClick(v: View) {
                             val view = inflater.inflate(R.layout.view_select, null)
                             val listView = view.findViewById<ListView>(R.id.listView)
@@ -1518,24 +1603,24 @@ class MainFunctions(private val service: AccessibilityService) {
                     val params = win.attributes
                     params.width = width
                     win.attributes = params
-                    dialog_main.dismiss()
+                    mainDialog.dismiss()
                 } catch (e: Throwable) {
                     e.printStackTrace()
                 }
                 return true
             }
         })
-        switch_screen_lightness.setOnLongClickListener {
+        screenLightnessSwitch.setOnLongClickListener {
             screenLightness!!.showControlDialog()
-            dialog_main.dismiss()
+            mainDialog.dismiss()
             true
         }
-        switchScreenLock.setOnLongClickListener {
+        screenLockSwitch.setOnLongClickListener {
             screenLock!!.showSetAreaDialog()
-            dialog_main.dismiss()
+            mainDialog.dismiss()
             true
         }
-        switchScreenLock.setOnCheckedChangeListener { _, isChecked ->
+        screenLockSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked && !devicePolicyManager!!.isAdminActive(componentName) && (Build.VERSION.SDK_INT < Build.VERSION_CODES.P)) {
                 val intent = Intent().setComponent(
                     ComponentName(
@@ -1546,7 +1631,7 @@ class MainFunctions(private val service: AccessibilityService) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 service.startActivity(intent)
                 controlLock = false
-                dialog_main.dismiss()
+                mainDialog.dismiss()
             }
         }
         btSetting.setOnClickListener {
@@ -1557,46 +1642,46 @@ class MainFunctions(private val service: AccessibilityService) {
             )
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             service.startActivity(intent)
-            dialog_main.dismiss()
+            mainDialog.dismiss()
         }
-        bt_look.setOnClickListener {
+        btHelp.setOnClickListener {
             val intent = Intent(service, HelpActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             service.startActivity(intent)
-            dialog_main.dismiss()
+            mainDialog.dismiss()
         }
-        bt_cancel.setOnClickListener { dialog_main.dismiss() }
-        bt_sure.setOnClickListener {
-            if (switch_skip_advertising.isChecked) {
-                accessibilityServiceInfo!!.eventTypes =
-                    accessibilityServiceInfo!!.eventTypes or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                skipAdvertising = true
+        btCancel.setOnClickListener { mainDialog.dismiss() }
+        btSure.setOnClickListener {
+            if (skipAdvertisingSwitch.isChecked) {
+                accessibilityServiceInfo.eventTypes =
+                    accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                skipAdvertisingEnable = true
             } else {
-                accessibilityServiceInfo!!.eventTypes =
-                    accessibilityServiceInfo!!.eventTypes and (AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).inv()
-                skipAdvertising = false
+                accessibilityServiceInfo.eventTypes =
+                    accessibilityServiceInfo.eventTypes and (AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).inv()
+                skipAdvertisingEnable = false
             }
-            if (switch_music_control.isChecked) {
+            if (musicControlSwitch.isChecked) {
                 if (!controlMusicOnlyLock) {
-                    accessibilityServiceInfo!!.flags =
-                        accessibilityServiceInfo!!.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+                    accessibilityServiceInfo.flags =
+                        accessibilityServiceInfo.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                 }
-                control_music = true
+                controlMusicEnable = true
             } else {
-                accessibilityServiceInfo!!.flags =
-                    accessibilityServiceInfo!!.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
-                control_music = false
+                accessibilityServiceInfo.flags =
+                    accessibilityServiceInfo.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
+                controlMusicEnable = false
             }
-            if (switch_record_message.isChecked) {
-                accessibilityServiceInfo!!.eventTypes =
-                    accessibilityServiceInfo!!.eventTypes or AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
-                record_message = true
+            if (recordNotificationSwitch.isChecked) {
+                accessibilityServiceInfo.eventTypes =
+                    accessibilityServiceInfo.eventTypes or AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
+                recordNotificationEnable = true
             } else {
-                accessibilityServiceInfo!!.eventTypes =
-                    accessibilityServiceInfo!!.eventTypes and AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED.inv()
-                record_message = false
+                accessibilityServiceInfo.eventTypes =
+                    accessibilityServiceInfo.eventTypes and AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED.inv()
+                recordNotificationEnable = false
             }
-            if (switch_screen_lightness.isChecked) {
+            if (screenLightnessSwitch.isChecked) {
                 if (!controlLightness) {
                     screenLightness!!.showFloat()
                     controlLightness = true
@@ -1607,7 +1692,7 @@ class MainFunctions(private val service: AccessibilityService) {
                     controlLightness = false
                 }
             }
-            if (switchScreenLock.isChecked) {
+            if (screenLockSwitch.isChecked) {
                 if (!controlLock) {
                     screenLock!!.showLockFloat()
                     controlLock = true
@@ -1619,25 +1704,31 @@ class MainFunctions(private val service: AccessibilityService) {
                 }
             }
             service.serviceInfo = accessibilityServiceInfo
-            sharedPreferences.edit().putBoolean(SKIP_ADVERTISING, skipAdvertising)
-                .putBoolean(
-                    CONTROL_MUSIC, control_music
-                ).putBoolean(RECORD_MESSAGE, record_message).putBoolean(
-                    CONTROL_LIGHTNESS, controlLightness
-                ).putBoolean(CONTROL_LOCK, controlLock).apply()
-            dialog_main.dismiss()
+            sharedPreferences.edit()
+                .putBoolean(SKIP_ADVERTISING, skipAdvertisingEnable)
+                .putBoolean(CONTROL_MUSIC, controlMusicEnable)
+                .putBoolean(RECORD_MESSAGE, recordNotificationEnable)
+                .putBoolean(CONTROL_LIGHTNESS, controlLightness)
+                .putBoolean(CONTROL_LOCK, controlLock).apply()
+            mainDialog.dismiss()
         }
-        val win = dialog_main.window
+        val win = mainDialog.window
         win!!.setBackgroundDrawableResource(R.drawable.dialogbackground)
         win.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
         win.setDimAmount(0f)
-        dialog_main.show()
+        mainDialog.show()
         val params = win.attributes
         params.width = (width / 6) * 5
         win.attributes = params
     }
 
     companion object {
+        const val MESSAGE_MAIN_UI = 0x00
+        const val MESSAGE_LOCK_SCREEN = 0x01
+        const val MESSAGE_REFRESH_PACKAGE = 0x02
+
+        const val MESSAGE_DISABLE_SELF = 0x04
+
         private const val TAG = "MyAccessibilityService"
         private const val CONTROL_LIGHTNESS = "control_lightness"
         private const val CONTROL_LOCK = "control_lock"

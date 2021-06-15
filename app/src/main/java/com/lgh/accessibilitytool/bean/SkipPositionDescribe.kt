@@ -1,4 +1,4 @@
-package com.lgh.accessibilitytool
+package com.lgh.accessibilitytool.bean
 
 class SkipPositionDescribe {
     var packageName: String
